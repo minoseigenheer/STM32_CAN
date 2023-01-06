@@ -378,7 +378,7 @@ HAL_StatusTypeDef tSTM32_CAN::CANInit()
 	canBus->Init.TimeTriggeredMode = DISABLE;
 	canBus->Init.AutoBusOff = DISABLE;
 	canBus->Init.AutoWakeUp = DISABLE;
-	canBus->Init.AutoRetransmission = DISABLE;
+	canBus->Init.AutoRetransmission = ENABLE;
 	canBus->Init.ReceiveFifoLocked = DISABLE;
 	canBus->Init.TransmitFifoPriority = ENABLE;
 
