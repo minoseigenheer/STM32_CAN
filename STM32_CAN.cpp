@@ -60,7 +60,8 @@ tSTM32_CAN::tSTM32_CAN(CAN_HandleTypeDef *_canBus, CANbaudRatePrescaler _CANbaud
 	//NMEA2000_STM32_instance = this;
 	canInstances.push_back(this); // add this instance to canInstances
 
-	CANRxFIFO = CAN_RX_FIFO0; //  fpr now only use fifo 0
+	// TODO for now we only use RX fifo 0
+	CANRxFIFO = CAN_RX_FIFO0;
 
 	rxRing = 0;
 	txRing = 0;
@@ -68,6 +69,7 @@ tSTM32_CAN::tSTM32_CAN(CAN_HandleTypeDef *_canBus, CANbaudRatePrescaler _CANbaud
 	MaxCANReceiveFrames = 32;
 	MaxCANSendFrames = 16;
 
+	// TODO make prioBits configurable for each instance
 	prioBits = 3; // For NMEA2000 or SAE J1939 we use only the 3 highest bits of the ID for the priority
 	maxPrio = pow(2, prioBits) - 1; // max unsigned value is 2^prioBits -1   (for 3 bits priority 0...7)
 

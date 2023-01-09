@@ -91,7 +91,6 @@ class tSTM32_CAN
     };
 
   protected:
-    void InitCANFrameBuffers();
     uint16_t MaxCANReceiveFrames;
     uint16_t MaxCANSendFrames;
 
@@ -118,15 +117,17 @@ class tSTM32_CAN
 
 
   public:
-    bool CANOpen();
+    void InitCANFrameBuffers();
     HAL_StatusTypeDef CANInit();
     HAL_StatusTypeDef SetCANFilter( bool ExtendedIdentifier, uint32_t FilterNum, uint32_t Mask, uint32_t Filter );
+    bool CANOpen();
 
     bool CANSendFrame(unsigned long id, unsigned char len, const unsigned char* buf, bool wait_sent = true);
     bool CANSendFrameStruct(CAN_message_t* message);
     bool CANGetFrame(unsigned long& id, unsigned char& len, unsigned char* buf);
     bool CANGetFrameStruct(CAN_message_t* message);
 
+    // triggered by interrupt
     void CANReadRxMailbox(CAN_HandleTypeDef *hcan, uint32_t CANRxFIFO);
     bool SendFromTxRing();
 
