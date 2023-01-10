@@ -26,17 +26,18 @@
 */
 
 #include "RingBuffer.h"
+#include "N2kStream.h"
 
-//#define RING_BUFFER_ERROR_DEBUG
+#define RING_BUFFER_ERROR_DEBUG
 //#define RING_BUFFER_DEBUG
 
+#if defined(ARDUINO)
 #if defined(RING_BUFFER_DEBUG) || defined(RING_BUFFER_ERROR_DEBUG)
   #include <Arduino.h>
   #ifndef DebugStream
   #define DebugStream Serial
   #endif
 #endif
-
 #if defined(RING_BUFFER_ERROR_DEBUG)
   # define RingBufferErrDbgf(fmt, args...)   DebugStream.printf (fmt , ## args)
 #else
@@ -48,6 +49,20 @@
 #else
   # define RingBufferDbgf(fmt, args...)
 #endif
+#else
+#if defined(RING_BUFFER_ERROR_DEBUG)
+  # define RingBufferErrDbgf(fmt, args...)   printf (fmt , ## args)
+#else
+  # define RingBufferErrDbgf(fmt, args...)
+#endif
+
+#if defined(RING_BUFFER_DEBUG)
+  # define RingBufferDbgf(fmt, args...)   printf (fmt , ## args)
+#else
+  # define RingBufferDbgf(fmt, args...)
+#endif
+#endif
+
 
 
 // *****************************************************************************

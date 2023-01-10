@@ -44,7 +44,7 @@ based setup. See also NMEA2000 library.
 #include <stdint.h>
 #include <stdio.h>
 #include <stdbool.h>
-//#include <string>
+#include <string>
 #include <vector>
 
 #include "RingBuffer.h"
@@ -90,6 +90,8 @@ class tSTM32_CAN
   //    bool seq = 0;         // sequential frames
     };
 
+	std::string CANname;
+
   protected:
     uint16_t MaxCANReceiveFrames;
     uint16_t MaxCANSendFrames;
@@ -134,12 +136,12 @@ class tSTM32_CAN
 
 };
 
-static std::vector<tSTM32_CAN *> canInstances;
+static std::vector<tSTM32_CAN *> STM32CANInstances;
 tSTM32_CAN* getInstance(CAN_HandleTypeDef *hcan); // returns instance with certain CAN_HandleTypeDef struct
 
 //-----------------------------------------------------------------------------
 
-int _write(int file, char *ptr, int len);
+extern "C" int _write(int file, char *ptr, int len);
 uint32_t pow(uint32_t base, uint32_t exp);
 
 
