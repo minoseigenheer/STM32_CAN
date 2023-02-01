@@ -36,21 +36,27 @@
 
 #include "STM32_CAN.hpp"
 
+
+#ifdef DEBUG // STM32CubeIDE is automatically defining DEBUG for the debug build
 #define STM32_CAN_DEBUG
 #define STM32_CAN_DEBUG_ERRORS
+#endif
 
 #if defined(STM32_CAN_DEBUG)
-# define DbgPrintfSWD(fmt, args...)     printf(fmt, ## args); printf("\n")
+# define DbgPrintf(fmt, args...)     printf(fmt, ## args); printf("\n")
 #else
-# define DbgPrintfSWD(fmt, args...)
+# define DbgPrintf(fmt, args...)
 #endif
 
 #if defined(STM32_CAN_DEBUG_ERRORS)
-# define DbgPrintfSWDErr(fmt, args...)     printf(fmt, ## args); printf("\n")
+# define ErrDbgPrintf(fmt, args...)     printf(fmt, ## args); printf("\n")
 #else
-# define DbgPrintfSWDErr(fmt, args...)
+# define ErrDbgPrintf(fmt, args...)
 #endif
 
+
+size_t nextInstanceID = 0;
+tSTM32_CAN *STM32CANInstances[4];
 
 //*****************************************************************************
 tSTM32_CAN::tSTM32_CAN(CAN_HandleTypeDef *_canBus, CANbaudRatePrescaler _CANbaudRate) :
@@ -58,7 +64,11 @@ tSTM32_CAN::tSTM32_CAN(CAN_HandleTypeDef *_canBus, CANbaudRatePrescaler _CANbaud
 		CANbaudRate(_CANbaudRate) {
 
 	//NMEA2000_STM32_instance = this;
-	STM32CANInstances.push_back(this); // add this instance to STM32CANInstances
+	STM32CANInstances[nextInstanceID] = this;
+	nextInstanceID++;
+
+	//STM32CANInstances.push_back(this); // add this instance to STM32CANInstances
+	DbgPrintf("created tSTM32_CAN instance %p", this);
 
 	// TODO for now we only use RX fifo 0
 	CANRxFIFO = CAN_RX_FIFO0;
@@ -100,7 +110,7 @@ bool tSTM32_CAN::CANOpen() {
 		ret = false;
 	}
 
-	DbgPrintfSWD("%s started", CANname.c_str());
+	DbgPrintf("%s started", CANname.c_str());
 	return ret;
 }
 
@@ -127,7 +137,7 @@ bool tSTM32_CAN::CANSendFrame(unsigned long id, unsigned char len, const unsigne
 			memcpy(msg->buf, buf, len);
 			ret = true;
 			//frame buffered
-			DbgPrintfSWD("%s frame 0x%lx buffered", CANname.c_str(), id);
+			DbgPrintf("%s frame 0x%lx buffered", CANname.c_str(), id);
 		}
 		SendFromBuffer = true;
 	}
@@ -141,7 +151,7 @@ bool tSTM32_CAN::CANSendFrame(unsigned long id, unsigned char len, const unsigne
 		/* transmit entry accepted */
 	}
 	else {
-		DbgPrintfSWDErr("%s All TX mailboxes full", CANname.c_str());
+		ErrDbgPrintf("%s All TX mailboxes full", CANname.c_str());
 	}
 
 	HAL_CAN_ActivateNotification(canBus, CAN_IT_TX_MAILBOX_EMPTY);
@@ -212,14 +222,14 @@ void tSTM32_CAN::InitCANFrameBuffers() {
     delete txRing;
     txRing = 0;
   }
-  //							tPriorityRingBuffer(uint16_t _size, uint8_t _maxPriorities=1);
+
   if ( rxRing == 0 ) {
 	  rxRing=new tPriorityRingBuffer<CAN_message_t>(MaxCANReceiveFrames, maxPrio);
-	  DbgPrintfSWD("%s RX ring buffer initialized: MaxCANReceiveFrames: %u | maxPrio: %lu", CANname.c_str(), MaxCANReceiveFrames, maxPrio);
+	  DbgPrintf("%s RX ring buffer initialized: MaxCANReceiveFrames: %u | maxPrio: %lu", CANname.c_str(), MaxCANReceiveFrames, maxPrio);
   }
   if ( txRing == 0 ) {
 	  txRing=new tPriorityRingBuffer<CAN_message_t>(MaxCANSendFrames, maxPrio);
-	  DbgPrintfSWD("%s TX ring buffer initialized: MaxCANSendFrames: %u | maxPrio: %lu", CANname.c_str(), MaxCANReceiveFrames, maxPrio);
+	  DbgPrintf("%s TX ring buffer initialized: MaxCANSendFrames: %u | maxPrio: %lu", CANname.c_str(), MaxCANReceiveFrames, maxPrio);
   }
 
 
@@ -247,10 +257,10 @@ bool tSTM32_CAN::CANWriteTxMailbox(unsigned long id, unsigned char len, const un
 
 	// send message
 	if (HAL_CAN_AddTxMessage(canBus, &CANTxHeader, CANTxdata, &CANTxMailbox) == HAL_OK) {
-		DbgPrintfSWD("%s Added frame to TX mailbox 0x%lx", CANname.c_str(), id);
+		DbgPrintf("%s Added frame 0x%lx to TX mailbox %lu", CANname.c_str(), id, CANTxMailbox);
 		return true;
 	} else {
-		DbgPrintfSWDErr("%s Failed to write TX mailbox 0x%lx", CANname.c_str(), id);
+		ErrDbgPrintf("%s Failed to write TX mailbox %lu (0x%lx)", CANname.c_str(), CANTxMailbox, id);
 		return false;
 	}
 
@@ -269,12 +279,12 @@ bool tSTM32_CAN::SendFromTxRing() {
 }
 
 // *****************************************************************************
-void tSTM32_CAN::CANReadRxMailbox(CAN_HandleTypeDef *hcan, uint32_t CANRxFIFO) {
+void tSTM32_CAN::CANReadRxMailbox(CAN_HandleTypeDef *hcan, uint32_t CANRxFIFOn) {
 	CAN_message_t *rxMsg;
 	uint32_t id;
 	uint8_t prio;
 	if (hcan == canBus) {
-		if (HAL_CAN_GetRxMessage(hcan, CANRxFIFO, &CANRxHeader, CANRxdata) == HAL_OK) {
+		if (HAL_CAN_GetRxMessage(hcan, CANRxFIFOn, &CANRxHeader, CANRxdata) == HAL_OK) {
 			if (CANRxHeader.IDE == CAN_ID_EXT) {
 				id = CANRxHeader.ExtId;
 				prio = (uint8_t)(id >> (29-prioBits) & maxPrio);
@@ -290,9 +300,9 @@ void tSTM32_CAN::CANReadRxMailbox(CAN_HandleTypeDef *hcan, uint32_t CANRxFIFO) {
 				rxMsg->flags.remote = CANRxHeader.RTR == CAN_RTR_REMOTE;
 				rxMsg->flags.extended = CANRxHeader.IDE == CAN_ID_EXT;
 				rxMsg->id = CANRxHeader.ExtId;
+				memcpy(rxMsg->buf, CANRxdata, rxMsg->len);
 			}
-			memcpy(rxMsg->buf, CANRxdata, rxMsg->len);
-			DbgPrintfSWD("%s Received CAN message 0x%lx", CANname.c_str(), id);
+			DbgPrintf("%s Received CAN message 0x%lx", CANname.c_str(), id);
 		}
 	}
 
@@ -335,7 +345,7 @@ HAL_StatusTypeDef tSTM32_CAN::CANInit()
 	}
 #endif
 
-	DbgPrintfSWD("%s initialization", CANname.c_str());
+	DbgPrintf("%s initialization", CANname.c_str());
 
 	uint32_t CAN1000kbitPrescaler;
 	uint32_t CANtimeSeg1;
@@ -372,7 +382,7 @@ HAL_StatusTypeDef tSTM32_CAN::CANInit()
 		// On the following website you can find a matching prescaler, TS1 and TS2
 		// Add the values for your clock speed and 1000kbit/s
 		// http://www.bittiming.can-wiki.info/?CLK=36&ctype=bxCAN&SamplePoint=87.5
-		DbgPrintfSWDErr("%s initialization error (No CAN settings for this clock speed.)", CANname.c_str());
+		ErrDbgPrintf("%s initialization error (No CAN settings for this clock speed.)", CANname.c_str());
 		return HAL_ERROR;
 	}
 
@@ -459,7 +469,7 @@ HAL_StatusTypeDef tSTM32_CAN::SetCANFilter( bool ExtendedIdentifier, uint32_t Fi
 		sFilterConfig.SlaveStartFilterBank = SlaveStartFilterBank; // CAN 0: 0...13 // CAN 1: 14...27 (28 filter banks in total)
 
 		ret = HAL_CAN_ConfigFilter(canBus, &sFilterConfig);
-		DbgPrintfSWD("%s filter bank %li mask: %08lx, filter: %08lx", CANname.c_str(), FilterBank, Mask, Filter);
+		DbgPrintf("%s filter bank %li mask: %08lx, filter: %08lx", CANname.c_str(), FilterBank, Mask, Filter);
 	}
 	return ret;
 }
@@ -473,67 +483,70 @@ HAL_StatusTypeDef tSTM32_CAN::SetCANFilter( bool ExtendedIdentifier, uint32_t Fi
   */
 tSTM32_CAN* getInstance(CAN_HandleTypeDef *hcan)
 {
-	tSTM32_CAN* instance;
-	for (auto & inst : STM32CANInstances) { // iterate over all STM32CANInstances
-		if (inst->canBus == hcan) {
-			instance = inst;
+	tSTM32_CAN* ret = 0;
+	//DbgPrintf("searching for instance with CAN_HandleTypeDef = %p", hcan);
+	for(size_t i = 0; i < nextInstanceID-1; ++i) {
+		if (STM32CANInstances[i]->canBus == hcan) {
+			ret = STM32CANInstances[i];
+			//DbgPrintf("found matching instance %p", ret->canBus);
 		}
 	}
-	return instance;
+	return ret;
 }
 
-extern "C" void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
+void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
 {
 	getInstance(hcan)->CANReadRxMailbox(hcan, CAN_RX_FIFO0);
-	//NMEA2000_STM32_instance->CANReadRxMailbox(hcan);
+	//DbgPrintf("%s HAL_CAN_RxFifo0MsgPendingCallback", getInstance(hcan)->CANname.c_str());
 }
 
-extern "C" void HAL_CAN_TxMailbox0CompleteCallback(CAN_HandleTypeDef *hcan)
+void HAL_CAN_TxMailbox0CompleteCallback(CAN_HandleTypeDef *hcan)
 {
-	// Call TX Interrupt method
-	//NMEA2000_STM32_instance->SendFromTxRing(); // send message with highest priority on ring buffer
+	getInstance(hcan)->SendFromTxRing(); // send message with highest priority on ring buffer
+	//DbgPrintf("%s HAL_CAN_TxMailbox0CompleteCallback", getInstance(hcan)->CANname.c_str());
+}
+void HAL_CAN_TxMailbox1CompleteCallback(CAN_HandleTypeDef *hcan)
+{
 	getInstance(hcan)->SendFromTxRing(); // send message with highest priority on ring buffer
 }
-extern "C" void HAL_CAN_TxMailbox1CompleteCallback(CAN_HandleTypeDef *hcan)
+void HAL_CAN_TxMailbox2CompleteCallback(CAN_HandleTypeDef *hcan)
 {
-	// Call TX Interrupt method
-	getInstance(hcan)->SendFromTxRing(); // send message with highest priority on ring buffer
-}
-extern "C" void HAL_CAN_TxMailbox2CompleteCallback(CAN_HandleTypeDef *hcan)
-{
-	// Call TX Interrupt method
 	getInstance(hcan)->SendFromTxRing(); // send message with highest priority on ring buffer
 }
 
-extern "C" void HAL_CAN_ErrorCallback(CAN_HandleTypeDef *hcan)
+
+void HAL_CAN_ErrorCallback(CAN_HandleTypeDef *hcan)
 {
    uint32_t errorCode = hcan->ErrorCode;
 
-   if(errorCode & HAL_CAN_ERROR_NONE)            { DbgPrintfSWDErr("%s: No error", getInstance(hcan)->CANname.c_str()); }
-   if(errorCode & HAL_CAN_ERROR_EWG)             { DbgPrintfSWDErr("%s: Protocol Error Warning", getInstance(hcan)->CANname.c_str()); }
-   if(errorCode & HAL_CAN_ERROR_EPV)             { DbgPrintfSWDErr("%s: Error Passive", getInstance(hcan)->CANname.c_str()); }
-   if(errorCode & HAL_CAN_ERROR_BOF)             { DbgPrintfSWDErr("%s: Bus-off error", getInstance(hcan)->CANname.c_str()); }
-   if(errorCode & HAL_CAN_ERROR_STF)             { DbgPrintfSWDErr("%s: Stuff error", getInstance(hcan)->CANname.c_str()); }
-   if(errorCode & HAL_CAN_ERROR_FOR)             { DbgPrintfSWDErr("%s: Form error", getInstance(hcan)->CANname.c_str()); }
-   if(errorCode & HAL_CAN_ERROR_ACK)             { DbgPrintfSWDErr("%s: Acknowledgment error", getInstance(hcan)->CANname.c_str()); }
-   if(errorCode & HAL_CAN_ERROR_BR)              { DbgPrintfSWDErr("%s: Bit recessive error", getInstance(hcan)->CANname.c_str()); }
-   if(errorCode & HAL_CAN_ERROR_BD)              { DbgPrintfSWDErr("%s: Bit dominant error", getInstance(hcan)->CANname.c_str()); }
-   if(errorCode & HAL_CAN_ERROR_CRC)             { DbgPrintfSWDErr("%s: CRC error", getInstance(hcan)->CANname.c_str()); }
-   if(errorCode & HAL_CAN_ERROR_RX_FOV0)         { DbgPrintfSWDErr("%s: Rx FIFO 0 overrun error", getInstance(hcan)->CANname.c_str()); }
-   if(errorCode & HAL_CAN_ERROR_RX_FOV1)         { DbgPrintfSWDErr("%s: Rx FIFO 1 overrun error", getInstance(hcan)->CANname.c_str()); }
-   if(errorCode & HAL_CAN_ERROR_TX_ALST0)        { DbgPrintfSWDErr("%s: TxMailbox 0 transmit failure due to arbitration lost", getInstance(hcan)->CANname.c_str()); }
-   if(errorCode & HAL_CAN_ERROR_TX_TERR0)        { DbgPrintfSWDErr("%s: TxMailbox 0 transmit failure due to transmit error", getInstance(hcan)->CANname.c_str()); }
-   if(errorCode & HAL_CAN_ERROR_TX_ALST1)        { DbgPrintfSWDErr("%s: TxMailbox 1 transmit failure due to arbitration lost", getInstance(hcan)->CANname.c_str()); }
-   if(errorCode & HAL_CAN_ERROR_TX_TERR1)        { DbgPrintfSWDErr("%s: TxMailbox 1 transmit failure due to transmit error", getInstance(hcan)->CANname.c_str()); }
-   if(errorCode & HAL_CAN_ERROR_TX_ALST2)        { DbgPrintfSWDErr("%s: TxMailbox 2 transmit failure due to arbitration lost", getInstance(hcan)->CANname.c_str()); }
-   if(errorCode & HAL_CAN_ERROR_TX_TERR2)        { DbgPrintfSWDErr("%s: TxMailbox 2 transmit failure due to transmit error", getInstance(hcan)->CANname.c_str()); }
-   if(errorCode & HAL_CAN_ERROR_TIMEOUT)         { DbgPrintfSWDErr("%s: Timeout error", getInstance(hcan)->CANname.c_str()); }
-   if(errorCode & HAL_CAN_ERROR_NOT_INITIALIZED) { DbgPrintfSWDErr("%s: Peripheral not initialized", getInstance(hcan)->CANname.c_str()); }
-   if(errorCode & HAL_CAN_ERROR_NOT_READY)       { DbgPrintfSWDErr("%s: Peripheral not ready", getInstance(hcan)->CANname.c_str()); }
-   if(errorCode & HAL_CAN_ERROR_NOT_STARTED)     { DbgPrintfSWDErr("%s: Peripheral not started", getInstance(hcan)->CANname.c_str()); }
-   if(errorCode & HAL_CAN_ERROR_PARAM)           { DbgPrintfSWDErr("%s: Parameter error", getInstance(hcan)->CANname.c_str()); }
-
+#if defined(STM32_CAN_DEBUG_ERRORS)
+   if(errorCode & HAL_CAN_ERROR_NONE)            { ErrDbgPrintf("%s: No error", getInstance(hcan)->CANname.c_str()); }
+   if(errorCode & HAL_CAN_ERROR_EWG)             { ErrDbgPrintf("%s: Protocol Error Warning", getInstance(hcan)->CANname.c_str()); }
+   if(errorCode & HAL_CAN_ERROR_EPV)             { ErrDbgPrintf("%s: Error Passive", getInstance(hcan)->CANname.c_str()); }
+   if(errorCode & HAL_CAN_ERROR_BOF)             { ErrDbgPrintf("%s: Bus-off error", getInstance(hcan)->CANname.c_str()); }
+   if(errorCode & HAL_CAN_ERROR_STF)             { ErrDbgPrintf("%s: Stuff error", getInstance(hcan)->CANname.c_str()); }
+   if(errorCode & HAL_CAN_ERROR_FOR)             { ErrDbgPrintf("%s: Form error", getInstance(hcan)->CANname.c_str()); }
+   if(errorCode & HAL_CAN_ERROR_ACK)             { ErrDbgPrintf("%s: Acknowledgment error", getInstance(hcan)->CANname.c_str()); }
+   if(errorCode & HAL_CAN_ERROR_BR)              { ErrDbgPrintf("%s: Bit recessive error", getInstance(hcan)->CANname.c_str()); }
+   if(errorCode & HAL_CAN_ERROR_BD)              { ErrDbgPrintf("%s: Bit dominant error", getInstance(hcan)->CANname.c_str()); }
+   if(errorCode & HAL_CAN_ERROR_CRC)             { ErrDbgPrintf("%s: CRC error", getInstance(hcan)->CANname.c_str()); }
+   if(errorCode & HAL_CAN_ERROR_RX_FOV0)         { ErrDbgPrintf("%s: Rx FIFO 0 overrun error", getInstance(hcan)->CANname.c_str()); }
+   if(errorCode & HAL_CAN_ERROR_RX_FOV1)         { ErrDbgPrintf("%s: Rx FIFO 1 overrun error", getInstance(hcan)->CANname.c_str()); }
+   if(errorCode & HAL_CAN_ERROR_TX_ALST0)        { ErrDbgPrintf("%s: TxMailbox 0 transmit failure due to arbitration lost", getInstance(hcan)->CANname.c_str()); }
+   if(errorCode & HAL_CAN_ERROR_TX_TERR0)        { ErrDbgPrintf("%s: TxMailbox 0 transmit failure due to transmit error", getInstance(hcan)->CANname.c_str()); }
+   if(errorCode & HAL_CAN_ERROR_TX_ALST1)        { ErrDbgPrintf("%s: TxMailbox 1 transmit failure due to arbitration lost", getInstance(hcan)->CANname.c_str()); }
+   if(errorCode & HAL_CAN_ERROR_TX_TERR1)        { ErrDbgPrintf("%s: TxMailbox 1 transmit failure due to transmit error", getInstance(hcan)->CANname.c_str()); }
+   if(errorCode & HAL_CAN_ERROR_TX_ALST2)        { ErrDbgPrintf("%s: TxMailbox 2 transmit failure due to arbitration lost", getInstance(hcan)->CANname.c_str()); }
+   if(errorCode & HAL_CAN_ERROR_TX_TERR2)        { ErrDbgPrintf("%s: TxMailbox 2 transmit failure due to transmit error", getInstance(hcan)->CANname.c_str()); }
+   if(errorCode & HAL_CAN_ERROR_TIMEOUT)         { ErrDbgPrintf("%s: Timeout error", getInstance(hcan)->CANname.c_str()); }
+   if(errorCode & HAL_CAN_ERROR_NOT_INITIALIZED) { ErrDbgPrintf("%s: Peripheral not initialized", getInstance(hcan)->CANname.c_str()); }
+   if(errorCode & HAL_CAN_ERROR_NOT_READY)       { ErrDbgPrintf("%s: Peripheral not ready", getInstance(hcan)->CANname.c_str()); }
+   if(errorCode & HAL_CAN_ERROR_NOT_STARTED)     { ErrDbgPrintf("%s: Peripheral not started", getInstance(hcan)->CANname.c_str()); }
+   if(errorCode & HAL_CAN_ERROR_PARAM)           { ErrDbgPrintf("%s: Parameter error", getInstance(hcan)->CANname.c_str()); }
+#endif
 }
+
+
 // *****************************************************************************
 //	Other 'Bridge' functions
 

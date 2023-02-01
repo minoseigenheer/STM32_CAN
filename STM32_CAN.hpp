@@ -34,7 +34,7 @@ based setup. See also NMEA2000 library.
 */
 
 
-#ifndef _STM32_CAN_H_
+#ifndef STM32_CAN_H_
 #define STM32_CAN_H_
 
 #include "stm32f1xx_hal.h"
@@ -45,7 +45,6 @@ based setup. See also NMEA2000 library.
 #include <stdio.h>
 #include <stdbool.h>
 #include <string>
-#include <vector>
 
 #include "RingBuffer.h"
 
@@ -124,7 +123,7 @@ class tSTM32_CAN
     HAL_StatusTypeDef SetCANFilter( bool ExtendedIdentifier, uint32_t FilterNum, uint32_t Mask, uint32_t Filter );
     bool CANOpen();
 
-    bool CANSendFrame(unsigned long id, unsigned char len, const unsigned char* buf, bool wait_sent = true);
+    bool CANSendFrame(unsigned long id, unsigned char len, const unsigned char* buf, bool wait_sent = false);
     bool CANSendFrameStruct(CAN_message_t* message);
     bool CANGetFrame(unsigned long& id, unsigned char& len, unsigned char* buf);
     bool CANGetFrameStruct(CAN_message_t* message);
@@ -136,7 +135,7 @@ class tSTM32_CAN
 
 };
 
-static std::vector<tSTM32_CAN *> STM32CANInstances;
+
 tSTM32_CAN* getInstance(CAN_HandleTypeDef *hcan); // returns instance with certain CAN_HandleTypeDef struct
 
 //-----------------------------------------------------------------------------
