@@ -123,8 +123,8 @@ class tSTM32_CAN
     HAL_StatusTypeDef SetCANFilter( bool ExtendedIdentifier, uint32_t FilterNum, uint32_t Mask, uint32_t Filter );
     bool CANOpen();
 
-    bool CANSendFrame(unsigned long id, unsigned char len, const unsigned char* buf, bool wait_sent = false);
-    bool CANSendFrameStruct(CAN_message_t* message);
+    bool CANSendFrame(unsigned long id, unsigned char len, const unsigned char* buf, bool wait_sent = false, bool extended_id = true);
+    bool CANSendFrame(CAN_message_t* message);
     bool CANGetFrame(unsigned long& id, unsigned char& len, unsigned char* buf);
     bool CANGetFrameStruct(CAN_message_t* message);
 
@@ -137,6 +137,9 @@ class tSTM32_CAN
 
 
 tSTM32_CAN* getInstance(CAN_HandleTypeDef *hcan); // returns instance with certain CAN_HandleTypeDef struct
+
+
+
 
 //-----------------------------------------------------------------------------
 
