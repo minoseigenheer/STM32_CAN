@@ -106,11 +106,13 @@ bool tSTM32_CAN::CANOpen() {
 	}
 
 	// Enable CAN
-	if (HAL_CAN_Start(canBus) != HAL_OK) {
+	if (HAL_CAN_Start(canBus) == HAL_OK) {
+		DbgPrintf("%s started", CANname.c_str());
+	}
+	else {
 		ret = false;
 	}
 
-	DbgPrintf("%s started", CANname.c_str());
 	return ret;
 }
 
@@ -185,6 +187,9 @@ bool tSTM32_CAN::CANSendFrame(tSTM32_CAN::CAN_message_t* message) {
 		HAL_CAN_DeactivateNotification(canBus, CAN_IT_TX_MAILBOX_EMPTY);
 
 		bool TxMailboxesFull = HAL_CAN_GetTxMailboxesFreeLevel(canBus) == 0;
+		if ( TxMailboxesFull ) {
+			DbgPrintf("%s all TX mailboxes are full", CANname.c_str());
+		}
 		bool SendFromBuffer = false;
 
 		// If TX buffer has already some frames waiting with higher prio or mailbox is full, buffer frame
@@ -196,6 +201,9 @@ bool tSTM32_CAN::CANSendFrame(tSTM32_CAN::CAN_message_t* message) {
 				//frame buffered
 				DbgPrintf("%s frame 0x%lx buffered", CANname.c_str(), message->id);
 			}
+			else {
+				DbgPrintf("%s TX ringbuffer is full", CANname.c_str());
+			}
 			SendFromBuffer = true;
 		}
 
@@ -206,9 +214,6 @@ bool tSTM32_CAN::CANSendFrame(tSTM32_CAN::CAN_message_t* message) {
 				ret = CANWriteTxMailbox(message->id, message->len, message->buf, message->flags.extended);
 			}
 			/* transmit entry accepted */
-		}
-		else {
-			DbgPrintf("%s All TX mailboxes full", CANname.c_str());
 		}
 
 		HAL_CAN_ActivateNotification(canBus, CAN_IT_TX_MAILBOX_EMPTY);
@@ -351,14 +356,13 @@ void tSTM32_CAN::CANReadRxMailbox(CAN_HandleTypeDef *hcan, uint32_t CANRxFIFOn) 
 				if ( rxMsg->len > 8 ) rxMsg->len = 8;
 				rxMsg->flags.remote = CANRxHeader.RTR == CAN_RTR_REMOTE;
 				rxMsg->flags.extended = CANRxHeader.IDE == CAN_ID_EXT;
-				rxMsg->id = CANRxHeader.ExtId;
 				memcpy(rxMsg->buf, CANRxdata, rxMsg->len);
 			}
 			DbgPrintf("%s Received CAN message 0x%lx", CANname.c_str(), id);
 		}
 	}
 
-	// I think we don't have to check the fifo fill level if we use interrups?
+	// I think we don't have to check the fifo fill level if we use interrupts?
 	// HAL_CAN_GetRxFifoFillLevel(*canBus, CAN_RX_FIFO1);
 
 }
@@ -556,7 +560,7 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
 void HAL_CAN_TxMailbox0CompleteCallback(CAN_HandleTypeDef *hcan)
 {
 	getInstance(hcan)->SendFromTxRing(); // send message with highest priority on ring buffer
-	DbgPrintf("%s HAL_CAN_TxMailbox0CompleteCallback", getInstance(hcan)->CANname.c_str());
+	//DbgPrintf("%s HAL_CAN_TxMailbox0CompleteCallback", getInstance(hcan)->CANname.c_str());
 }
 void HAL_CAN_TxMailbox1CompleteCallback(CAN_HandleTypeDef *hcan)
 {

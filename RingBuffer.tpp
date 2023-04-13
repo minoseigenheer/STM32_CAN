@@ -26,7 +26,7 @@
 */
 
 #include "RingBuffer.h"
-#include "N2kStream.h"
+//#include "N2kStream.h"
 
 #define RING_BUFFER_ERROR_DEBUG
 //#define RING_BUFFER_DEBUG
