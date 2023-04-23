@@ -22,7 +22,7 @@ constexpr tSchedulerTime SchedulerDisabled = -1; // 0xffffffffUL or 0xffffffffff
 
 class tSyncScheduler {
   protected:
-	tSchedulerTime NextTime;
+	tSchedulerTime NextTime = 0;
 	uint32_t Offset;  // Offset to avoid all calls with similar period trigger in the same cycle.
 	uint32_t Period;
 
