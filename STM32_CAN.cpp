@@ -38,7 +38,7 @@
 
 
 #ifdef DEBUG // STM32CubeIDE is automatically defining DEBUG for the debug build
-#define STM32_CAN_DEBUG
+//#define STM32_CAN_DEBUG
 #define STM32_CAN_DEBUG_ERRORS
 #endif
 
@@ -356,6 +356,7 @@ void tSTM32_CAN::CANReadRxMailbox(CAN_HandleTypeDef *hcan, uint32_t CANRxFIFOn) 
 				if ( rxMsg->len > 8 ) rxMsg->len = 8;
 				rxMsg->flags.remote = CANRxHeader.RTR == CAN_RTR_REMOTE;
 				rxMsg->flags.extended = CANRxHeader.IDE == CAN_ID_EXT;
+				rxMsg->id = id;
 				memcpy(rxMsg->buf, CANRxdata, rxMsg->len);
 			}
 			DbgPrintf("%s Received CAN message 0x%lx", CANname.c_str(), id);
