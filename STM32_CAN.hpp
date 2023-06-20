@@ -109,6 +109,8 @@ class tSTM32_CAN
 	const CANbaudRatePrescaler CANbaudRate;
 	uint32_t CANRxFIFO;
 
+	bool bufferFull;
+
 
   protected:
     tPriorityRingBuffer<CAN_message_t>  *rxRing;

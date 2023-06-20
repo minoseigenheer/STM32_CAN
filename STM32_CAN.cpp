@@ -1,11 +1,10 @@
 /*
  NMEA2000_STM32.cpp
 
-
+ Use with STM32 HAL for your MCU!
  Inherited NMEA2000 object for the STM32F105 internal CAN
  See also NMEA2000 library.
-
- Only use with STM32 HAL for your MCU!
+ And can be used as universal CAN library.
 
 
  Copyright (c) 2022 Minos Eigenheer
@@ -83,6 +82,8 @@ tSTM32_CAN::tSTM32_CAN(CAN_HandleTypeDef *_canBus, CANbaudRatePrescaler _CANbaud
 	prioBits = 3; // For NMEA2000 or SAE J1939 we use only the 3 highest bits of the ID for the priority
 	maxPrio = pow(2, prioBits) - 1; // max unsigned value is 2^prioBits -1   (for 3 bits priority 0...7)
 
+	bufferFull = false;
+
 }
 
 //*****************************************************************************
@@ -99,8 +100,11 @@ bool tSTM32_CAN::CANOpen() {
 	if (HAL_CAN_ActivateNotification(canBus,
 			CAN_IT_RX_FIFO0_MSG_PENDING
 			| CAN_IT_TX_MAILBOX_EMPTY
-			| CAN_IT_ERROR
 			| CAN_IT_ERROR_WARNING
+			| CAN_IT_ERROR_PASSIVE
+			| CAN_IT_BUSOFF
+			| CAN_IT_LAST_ERROR_CODE
+			| CAN_IT_ERROR
 		) != HAL_OK) {
 		ret = false;
 	}
@@ -199,10 +203,12 @@ bool tSTM32_CAN::CANSendFrame(tSTM32_CAN::CAN_message_t* message) {
 				memcpy(msg, message, sizeof(*msg));
 				ret = true;
 				//frame buffered
+				bufferFull = false;
 				DbgPrintf("%s frame 0x%lx buffered", CANname.c_str(), message->id);
 			}
-			else {
-				DbgPrintf("%s TX ringbuffer is full", CANname.c_str());
+			else if (!bufferFull){
+				bufferFull = true;
+				ErrDbgPrintf("%s TX ringbuffer is full", CANname.c_str());
 			}
 			SendFromBuffer = true;
 		}
