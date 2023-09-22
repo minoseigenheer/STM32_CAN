@@ -122,7 +122,7 @@ class tSTM32_CAN
   public:
     void InitCANFrameBuffers();
     HAL_StatusTypeDef CANInit();
-    HAL_StatusTypeDef SetCANFilter( bool ExtendedIdentifier, uint32_t FilterNum, uint32_t Mask, uint32_t Filter );
+    HAL_StatusTypeDef SetCANFilter(bool ExtendedId, uint32_t FilterNum, uint32_t Mask, uint32_t Id);
     bool CANOpen();
 
     bool CANSendFrame(unsigned long id, unsigned char len, const unsigned char* buf, bool wait_sent = false, bool extended_id = true);
