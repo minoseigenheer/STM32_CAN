@@ -512,19 +512,19 @@ HAL_StatusTypeDef tSTM32_CAN::SetCANFilter(bool ExtendedId, uint32_t FilterNum, 
 		sFilterConfig.FilterMode = CAN_FILTERMODE_IDMASK;
 		sFilterConfig.FilterScale = CAN_FILTERSCALE_32BIT;
 
-		if (ExtendedIdentifier == false)
+		if (ExtendedId == false)
 		{
 			sFilterConfig.FilterMaskIdHigh = Mask << 5 & 0xFFFF;
 			sFilterConfig.FilterMaskIdLow = 1 << 2; // Mask the IDE bit 2 (standard ID) // allows both remote request and data frames
-			sFilterConfig.FilterIdHigh = Filter << 5 & 0xFFFF; // STDID[10:0]
+			sFilterConfig.FilterIdHigh = Id << 5 & 0xFFFF; // STDID[10:0]
 			sFilterConfig.FilterIdLow =  0x0000; // IDE bit 2 needs to be 0 for standard ID
 		}
 		else
 		{ // ExtendedIdentifier == true
 			sFilterConfig.FilterMaskIdHigh = Mask >> 13 & 0xFFFF;
 			sFilterConfig.FilterMaskIdLow = (Mask << 3 & 0xFFF8) | (1 << 2);
-			sFilterConfig.FilterIdHigh = Filter >> 13 & 0xFFFF; // EXTID[28:13]
-			sFilterConfig.FilterIdLow = (Filter << 3 & 0xFFF8) | (1 << 2); // EXTID[12:0] + IDE
+			sFilterConfig.FilterIdHigh = Id >> 13 & 0xFFFF; // EXTID[28:13]
+			sFilterConfig.FilterIdLow = (Id << 3 & 0xFFF8) | (1 << 2); // EXTID[12:0] + IDE
 		}
 
 		sFilterConfig.FilterFIFOAssignment = CANRxFIFO;
