@@ -277,3 +277,13 @@ const T *tPriorityRingBuffer<T>::getReadRef(uint8_t *_priority) {
 
   return 0;
 }
+
+// *****************************************************************************
+template<typename T>
+uint16_t tPriorityRingBuffer<T>::count() {
+    int32_t entries = head - tail;
+
+    if ( entries < 0 ) entries += size;
+
+    return (uint16_t)entries;
+}
