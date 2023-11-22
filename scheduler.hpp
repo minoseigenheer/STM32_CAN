@@ -36,7 +36,7 @@ class tSyncScheduler {
 	inline bool IsEnabled() const { return NextTime!=SchedulerDisabled; }
 
 	inline bool IsTime() {
-		if(HAL_GetTick()>NextTime) {
+		if(HAL_GetTick() > NextTime) {
 			UpdateNextTime();
 			return true;
 		}

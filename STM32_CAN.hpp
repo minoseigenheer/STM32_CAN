@@ -110,6 +110,7 @@ class tSTM32_CAN
 	uint32_t CANRxFIFO;
 
 	bool bufferFull;
+	uint32_t bxCanErrorCode;
 
 
   protected:
@@ -129,6 +130,11 @@ class tSTM32_CAN
     bool CANSendFrame(CAN_message_t* message);
     bool CANGetFrame(unsigned long& id, unsigned char& len, unsigned char* buf);
     bool CANGetFrameStruct(CAN_message_t* message);
+
+    inline uint32_t getCanError() {return bxCanErrorCode;};
+    inline void setCanError(uint32_t err) {bxCanErrorCode = err;};
+    inline uint32_t getCanTxBufferSpace() {return txRing->getSize() - txRing->count();};
+    inline uint32_t getCanRxBufferSpace() {return rxRing->getSize() - rxRing->count();};
 
     // triggered by interrupt
     void CANReadRxMailbox(CAN_HandleTypeDef *hcan, uint32_t CANRxFIFO);

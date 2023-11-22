@@ -83,6 +83,7 @@ tSTM32_CAN::tSTM32_CAN(CAN_HandleTypeDef *_canBus, CANbaudRatePrescaler _CANbaud
 	maxPrio = pow(2, prioBits) - 1; // max unsigned value is 2^prioBits -1   (for 3 bits priority 0...7)
 
 	bufferFull = false;
+	bxCanErrorCode = 0;
 
 }
 
@@ -532,7 +533,7 @@ HAL_StatusTypeDef tSTM32_CAN::SetCANFilter(bool ExtendedId, uint32_t FilterNum, 
 		sFilterConfig.SlaveStartFilterBank = SlaveStartFilterBank; // CAN 0: 0...13 // CAN 1: 14...27 (28 filter banks in total)
 
 		ret = HAL_CAN_ConfigFilter(canBus, &sFilterConfig);
-		DbgPrintf("%s filter bank %li mask: %08lx, filter: %08lx", CANname.c_str(), FilterBank, Mask, Filter);
+		DbgPrintf("%s filter bank %li mask: %08lx, Id: %08lx", CANname.c_str(), FilterBank, Mask, Id);
 	}
 	return ret;
 }
@@ -562,51 +563,56 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
 {
 	getInstance(hcan)->CANReadRxMailbox(hcan, CAN_RX_FIFO0);
 	//DbgPrintf("%s HAL_CAN_RxFifo0MsgPendingCallback", getInstance(hcan)->CANname.c_str());
+	getInstance(hcan)->setCanError(hcan->ErrorCode); // copy CAN error state from HAL CAN handler to STM_CAN_Lib instance
 }
 
 void HAL_CAN_TxMailbox0CompleteCallback(CAN_HandleTypeDef *hcan)
 {
 	getInstance(hcan)->SendFromTxRing(); // send message with highest priority on ring buffer
 	//DbgPrintf("%s HAL_CAN_TxMailbox0CompleteCallback", getInstance(hcan)->CANname.c_str());
+	getInstance(hcan)->setCanError(hcan->ErrorCode); // copy CAN error state from HAL CAN handler to STM_CAN_Lib instance
+
 }
 void HAL_CAN_TxMailbox1CompleteCallback(CAN_HandleTypeDef *hcan)
 {
 	getInstance(hcan)->SendFromTxRing(); // send message with highest priority on ring buffer
+	getInstance(hcan)->setCanError(hcan->ErrorCode); // copy CAN error state from HAL CAN handler to STM_CAN_Lib instance
 }
 void HAL_CAN_TxMailbox2CompleteCallback(CAN_HandleTypeDef *hcan)
 {
 	getInstance(hcan)->SendFromTxRing(); // send message with highest priority on ring buffer
+	getInstance(hcan)->setCanError(hcan->ErrorCode); // copy CAN error state from HAL CAN handler to STM_CAN_Lib instance
 }
 
 
 void HAL_CAN_ErrorCallback(CAN_HandleTypeDef *hcan)
 {
-   uint32_t errorCode = hcan->ErrorCode;
+	getInstance(hcan)->setCanError(hcan->ErrorCode);
 
 #if defined(STM32_CAN_DEBUG_ERRORS)
-   if(errorCode & HAL_CAN_ERROR_NONE)            { ErrDbgPrintf("%s: No error", getInstance(hcan)->CANname.c_str()); }
-   if(errorCode & HAL_CAN_ERROR_EWG)             { ErrDbgPrintf("%s: Protocol Error Warning", getInstance(hcan)->CANname.c_str()); }
-   if(errorCode & HAL_CAN_ERROR_EPV)             { ErrDbgPrintf("%s: Error Passive", getInstance(hcan)->CANname.c_str()); }
-   if(errorCode & HAL_CAN_ERROR_BOF)             { ErrDbgPrintf("%s: Bus-off error", getInstance(hcan)->CANname.c_str()); }
-   if(errorCode & HAL_CAN_ERROR_STF)             { ErrDbgPrintf("%s: Stuff error", getInstance(hcan)->CANname.c_str()); }
-   if(errorCode & HAL_CAN_ERROR_FOR)             { ErrDbgPrintf("%s: Form error", getInstance(hcan)->CANname.c_str()); }
-   if(errorCode & HAL_CAN_ERROR_ACK)             { ErrDbgPrintf("%s: Acknowledgment error", getInstance(hcan)->CANname.c_str()); }
-   if(errorCode & HAL_CAN_ERROR_BR)              { ErrDbgPrintf("%s: Bit recessive error", getInstance(hcan)->CANname.c_str()); }
-   if(errorCode & HAL_CAN_ERROR_BD)              { ErrDbgPrintf("%s: Bit dominant error", getInstance(hcan)->CANname.c_str()); }
-   if(errorCode & HAL_CAN_ERROR_CRC)             { ErrDbgPrintf("%s: CRC error", getInstance(hcan)->CANname.c_str()); }
-   if(errorCode & HAL_CAN_ERROR_RX_FOV0)         { ErrDbgPrintf("%s: Rx FIFO 0 overrun error", getInstance(hcan)->CANname.c_str()); }
-   if(errorCode & HAL_CAN_ERROR_RX_FOV1)         { ErrDbgPrintf("%s: Rx FIFO 1 overrun error", getInstance(hcan)->CANname.c_str()); }
-   if(errorCode & HAL_CAN_ERROR_TX_ALST0)        { ErrDbgPrintf("%s: TxMailbox 0 transmit failure due to arbitration lost", getInstance(hcan)->CANname.c_str()); }
-   if(errorCode & HAL_CAN_ERROR_TX_TERR0)        { ErrDbgPrintf("%s: TxMailbox 0 transmit failure due to transmit error", getInstance(hcan)->CANname.c_str()); }
-   if(errorCode & HAL_CAN_ERROR_TX_ALST1)        { ErrDbgPrintf("%s: TxMailbox 1 transmit failure due to arbitration lost", getInstance(hcan)->CANname.c_str()); }
-   if(errorCode & HAL_CAN_ERROR_TX_TERR1)        { ErrDbgPrintf("%s: TxMailbox 1 transmit failure due to transmit error", getInstance(hcan)->CANname.c_str()); }
-   if(errorCode & HAL_CAN_ERROR_TX_ALST2)        { ErrDbgPrintf("%s: TxMailbox 2 transmit failure due to arbitration lost", getInstance(hcan)->CANname.c_str()); }
-   if(errorCode & HAL_CAN_ERROR_TX_TERR2)        { ErrDbgPrintf("%s: TxMailbox 2 transmit failure due to transmit error", getInstance(hcan)->CANname.c_str()); }
-   if(errorCode & HAL_CAN_ERROR_TIMEOUT)         { ErrDbgPrintf("%s: Timeout error", getInstance(hcan)->CANname.c_str()); }
-   if(errorCode & HAL_CAN_ERROR_NOT_INITIALIZED) { ErrDbgPrintf("%s: Peripheral not initialized", getInstance(hcan)->CANname.c_str()); }
-   if(errorCode & HAL_CAN_ERROR_NOT_READY)       { ErrDbgPrintf("%s: Peripheral not ready", getInstance(hcan)->CANname.c_str()); }
-   if(errorCode & HAL_CAN_ERROR_NOT_STARTED)     { ErrDbgPrintf("%s: Peripheral not started", getInstance(hcan)->CANname.c_str()); }
-   if(errorCode & HAL_CAN_ERROR_PARAM)           { ErrDbgPrintf("%s: Parameter error", getInstance(hcan)->CANname.c_str()); }
+   if(hcan->ErrorCode & HAL_CAN_ERROR_NONE)           { ErrDbgPrintf("%s: No error", getInstance(hcan)->CANname.c_str()); }
+   if(hcan->ErrorCode & HAL_CAN_ERROR_EWG)             { ErrDbgPrintf("%s: Protocol Error Warning", getInstance(hcan)->CANname.c_str()); }
+   if(hcan->ErrorCode & HAL_CAN_ERROR_EPV)             { ErrDbgPrintf("%s: Error Passive", getInstance(hcan)->CANname.c_str()); }
+   if(hcan->ErrorCode & HAL_CAN_ERROR_BOF)             { ErrDbgPrintf("%s: Bus-off error", getInstance(hcan)->CANname.c_str()); }
+   if(hcan->ErrorCode & HAL_CAN_ERROR_STF)             { ErrDbgPrintf("%s: Stuff error", getInstance(hcan)->CANname.c_str()); }
+   if(hcan->ErrorCode & HAL_CAN_ERROR_FOR)             { ErrDbgPrintf("%s: Form error", getInstance(hcan)->CANname.c_str()); }
+   if(hcan->ErrorCode & HAL_CAN_ERROR_ACK)             { ErrDbgPrintf("%s: Acknowledgment error", getInstance(hcan)->CANname.c_str()); }
+   if(hcan->ErrorCode & HAL_CAN_ERROR_BR)              { ErrDbgPrintf("%s: Bit recessive error", getInstance(hcan)->CANname.c_str()); }
+   if(hcan->ErrorCode & HAL_CAN_ERROR_BD)              { ErrDbgPrintf("%s: Bit dominant error", getInstance(hcan)->CANname.c_str()); }
+   if(hcan->ErrorCode & HAL_CAN_ERROR_CRC)             { ErrDbgPrintf("%s: CRC error", getInstance(hcan)->CANname.c_str()); }
+   if(hcan->ErrorCode & HAL_CAN_ERROR_RX_FOV0)         { ErrDbgPrintf("%s: Rx FIFO 0 overrun error", getInstance(hcan)->CANname.c_str()); }
+   if(hcan->ErrorCode & HAL_CAN_ERROR_RX_FOV1)         { ErrDbgPrintf("%s: Rx FIFO 1 overrun error", getInstance(hcan)->CANname.c_str()); }
+   if(hcan->ErrorCode & HAL_CAN_ERROR_TX_ALST0)        { ErrDbgPrintf("%s: TxMailbox 0 transmit failure due to arbitration lost", getInstance(hcan)->CANname.c_str()); }
+   if(hcan->ErrorCode & HAL_CAN_ERROR_TX_TERR0)        { ErrDbgPrintf("%s: TxMailbox 0 transmit failure due to transmit error", getInstance(hcan)->CANname.c_str()); }
+   if(hcan->ErrorCode & HAL_CAN_ERROR_TX_ALST1)        { ErrDbgPrintf("%s: TxMailbox 1 transmit failure due to arbitration lost", getInstance(hcan)->CANname.c_str()); }
+   if(hcan->ErrorCode & HAL_CAN_ERROR_TX_TERR1)        { ErrDbgPrintf("%s: TxMailbox 1 transmit failure due to transmit error", getInstance(hcan)->CANname.c_str()); }
+   if(hcan->ErrorCode & HAL_CAN_ERROR_TX_ALST2)        { ErrDbgPrintf("%s: TxMailbox 2 transmit failure due to arbitration lost", getInstance(hcan)->CANname.c_str()); }
+   if(hcan->ErrorCode & HAL_CAN_ERROR_TX_TERR2)        { ErrDbgPrintf("%s: TxMailbox 2 transmit failure due to transmit error", getInstance(hcan)->CANname.c_str()); }
+   if(hcan->ErrorCode & HAL_CAN_ERROR_TIMEOUT)         { ErrDbgPrintf("%s: Timeout error", getInstance(hcan)->CANname.c_str()); }
+   if(hcan->ErrorCode & HAL_CAN_ERROR_NOT_INITIALIZED) { ErrDbgPrintf("%s: Peripheral not initialized", getInstance(hcan)->CANname.c_str()); }
+   if(hcan->ErrorCode & HAL_CAN_ERROR_NOT_READY)       { ErrDbgPrintf("%s: Peripheral not ready", getInstance(hcan)->CANname.c_str()); }
+   if(hcan->ErrorCode & HAL_CAN_ERROR_NOT_STARTED)     { ErrDbgPrintf("%s: Peripheral not started", getInstance(hcan)->CANname.c_str()); }
+   if(hcan->ErrorCode & HAL_CAN_ERROR_PARAM)           { ErrDbgPrintf("%s: Parameter error", getInstance(hcan)->CANname.c_str()); }
 #endif
 }
 
