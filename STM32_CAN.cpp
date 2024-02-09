@@ -1,11 +1,7 @@
 /*
- NMEA2000_STM32.cpp
+ STM32_CAN.cpp
 
- Use with STM32 HAL for your MCU!
- Inherited NMEA2000 object for the STM32F105 internal CAN
- See also NMEA2000 library.
- And can be used as universal CAN library.
-
+ Use with STM32F1 HAL for your MCU!
 
  Copyright (c) 2022 Minos Eigenheer
 
@@ -103,8 +99,8 @@ bool tSTM32_CAN::CANOpen() {
 			| CAN_IT_TX_MAILBOX_EMPTY
 			| CAN_IT_ERROR_WARNING
 			| CAN_IT_ERROR_PASSIVE
-			| CAN_IT_BUSOFF
-			| CAN_IT_LAST_ERROR_CODE
+			//| CAN_IT_BUSOFF
+			//| CAN_IT_LAST_ERROR_CODE
 			| CAN_IT_ERROR
 		) != HAL_OK) {
 		ret = false;
@@ -407,7 +403,7 @@ HAL_StatusTypeDef tSTM32_CAN::CANInit()
 		// CAN_HandleTypeDef *hcan is unknown
 		return HAL_ERROR;
 	}
-#endif
+#endif // CAN1
 
 	DbgPrintf("%s initialization", CANname.c_str());
 

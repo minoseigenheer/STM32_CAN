@@ -155,5 +155,5 @@ extern "C" int _write(int file, char *ptr, int len);
 uint32_t pow(uint32_t base, uint32_t exp);
 
 
-#endif /* NMEA2000_STM32_H_ */
+#endif /* STM32_CAN_H_ */
 
