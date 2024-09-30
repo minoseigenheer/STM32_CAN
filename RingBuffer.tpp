@@ -283,7 +283,8 @@ template<typename T>
 uint16_t tPriorityRingBuffer<T>::count() {
     int32_t entries = head - tail;
 
-    if ( entries < 0 ) entries += size;
+	if ( entries > size ) entries = 0;
+    else if ( entries < 0 ) entries += size;
 
     return (uint16_t)entries;
 }

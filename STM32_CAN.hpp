@@ -123,6 +123,7 @@ class tSTM32_CAN
   public:
     void InitCANFrameBuffers();
     HAL_StatusTypeDef CANInit();
+    void CANDeinit();
     HAL_StatusTypeDef SetCANFilter(bool ExtendedId, uint32_t FilterNum, uint32_t Mask, uint32_t Id);
     bool CANOpen();
 
@@ -131,10 +132,35 @@ class tSTM32_CAN
     bool CANGetFrame(unsigned long& id, unsigned char& len, unsigned char* buf);
     bool CANGetFrameStruct(CAN_message_t* message);
 
-    inline uint32_t getCanError() {return bxCanErrorCode;};
-    inline void setCanError(uint32_t err) {bxCanErrorCode = err;};
-    inline uint32_t getCanTxBufferSpace() {return txRing->getSize() - txRing->count();};
-    inline uint32_t getCanRxBufferSpace() {return rxRing->getSize() - rxRing->count();};
+    inline uint32_t getCanError() {return bxCanErrorCode;}
+    inline void setImportantCanError(uint32_t err) {bxCanErrorCode = err & (
+ 	       // HAL_CAN_ERROR_EWG             | // Protocol Error Warning
+ 	       // HAL_CAN_ERROR_EPV             | // Error Passive
+ 	        HAL_CAN_ERROR_BOF             | // Bus-off error
+ 	        HAL_CAN_ERROR_STF             | // Stuff error
+ 	        HAL_CAN_ERROR_FOR             | // Form error
+ 	        HAL_CAN_ERROR_ACK             | // Acknowledgment error
+ 	        HAL_CAN_ERROR_BR              | // Bit recessive error
+ 	        HAL_CAN_ERROR_BD              | // Bit dominant error
+ 	        HAL_CAN_ERROR_CRC             | // CRC error
+ 	        HAL_CAN_ERROR_RX_FOV0         | // Rx FIFO0 overrun error
+ 	        HAL_CAN_ERROR_RX_FOV1         | // Rx FIFO1 overrun error
+ 	        HAL_CAN_ERROR_TX_ALST0        | // TxMailbox 0 transmit failure due to arbitration lost
+ 	        HAL_CAN_ERROR_TX_TERR0        | // TxMailbox 0 transmit failure due to transmit error
+ 	        HAL_CAN_ERROR_TX_ALST1        | // TxMailbox 1 transmit failure due to arbitration lost
+ 	        HAL_CAN_ERROR_TX_TERR1        | // TxMailbox 1 transmit failure due to transmit error
+ 	        HAL_CAN_ERROR_TX_ALST2        | // TxMailbox 2 transmit failure due to arbitration lost
+ 	        HAL_CAN_ERROR_TX_TERR2        | // TxMailbox 2 transmit failure due to transmit error
+ 	        HAL_CAN_ERROR_TIMEOUT         | // Timeout error
+ 	        HAL_CAN_ERROR_NOT_INITIALIZED | // Peripheral not initialized
+ 	        HAL_CAN_ERROR_NOT_READY       | // Peripheral not ready
+ 	        HAL_CAN_ERROR_NOT_STARTED     | // Peripheral not started
+ 	        HAL_CAN_ERROR_PARAM             // Parameter error
+ 	    );}
+    inline int32_t getCanTxBufferSpace() {return txRing->getSize() - txRing->count() - 1;}
+    inline int32_t getCanRxBufferSpace() {return rxRing->getSize() - rxRing->count() - 1;}
+//    void LoopbackMode();
+//    void NormalMode();
 
     // triggered by interrupt
     void CANReadRxMailbox(CAN_HandleTypeDef *hcan, uint32_t CANRxFIFO);

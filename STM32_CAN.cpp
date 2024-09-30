@@ -99,8 +99,8 @@ bool tSTM32_CAN::CANOpen() {
 			| CAN_IT_TX_MAILBOX_EMPTY
 			| CAN_IT_ERROR_WARNING
 			| CAN_IT_ERROR_PASSIVE
-			//| CAN_IT_BUSOFF
-			//| CAN_IT_LAST_ERROR_CODE
+			| CAN_IT_BUSOFF
+			| CAN_IT_LAST_ERROR_CODE
 			| CAN_IT_ERROR
 		) != HAL_OK) {
 		ret = false;
@@ -118,11 +118,9 @@ bool tSTM32_CAN::CANOpen() {
 }
 
 //*****************************************************************************
-bool tSTM32_CAN::CANSendFrame(unsigned long id, unsigned char len, const unsigned char* buf, bool wait_sent, bool extended_id) {
-	//TODO wait_sent
-
+bool tSTM32_CAN::CANSendFrame(unsigned long id, unsigned char len, const unsigned char* buf, bool wait_sent, bool extended_id)
+{
 	bool ret = false;
-
 	uint8_t prio;
 
 	if (extended_id) {
@@ -172,56 +170,55 @@ bool tSTM32_CAN::CANSendFrame(unsigned long id, unsigned char len, const unsigne
 }
 
 //*****************************************************************************
-bool tSTM32_CAN::CANSendFrame(tSTM32_CAN::CAN_message_t* message) {
-
+bool tSTM32_CAN::CANSendFrame(tSTM32_CAN::CAN_message_t* message)
+{
 	bool ret = false;
+	uint8_t prio;
 
-		uint8_t prio;
+	if (message->flags.extended) {
+		prio = (uint8_t)(message->id >> (29-prioBits) & maxPrio);
+	}
+	else {
+		prio = (uint8_t)(message->id >> (11-prioBits) & maxPrio);
+	}
 
-		if (message->flags.extended) {
-			prio = (uint8_t)(message->id >> (29-prioBits) & maxPrio);
+	HAL_CAN_DeactivateNotification(canBus, CAN_IT_TX_MAILBOX_EMPTY);
+
+	bool TxMailboxesFull = HAL_CAN_GetTxMailboxesFreeLevel(canBus) == 0;
+	if ( TxMailboxesFull ) {
+		DbgPrintf("%s all TX mailboxes are full", CANname.c_str());
+	}
+	bool SendFromBuffer = false;
+
+	// If TX buffer has already some frames waiting with higher prio or mailbox is full, buffer frame
+	if ( !txRing->isEmpty(prio) || TxMailboxesFull ) {
+		CAN_message_t *msg = txRing->getAddRef(prio);
+		if ( msg!=0 ) {
+			memcpy(msg, message, sizeof(*msg));
+			ret = true;
+			//frame buffered
+			bufferFull = false;
+			DbgPrintf("%s frame 0x%lx buffered", CANname.c_str(), message->id);
 		}
-		else {
-			prio = (uint8_t)(message->id >> (11-prioBits) & maxPrio);
+		else if (!bufferFull){
+			bufferFull = true;
+			ErrDbgPrintf("%s TX ringbuffer is full", CANname.c_str());
 		}
+		SendFromBuffer = true;
+	}
 
-		HAL_CAN_DeactivateNotification(canBus, CAN_IT_TX_MAILBOX_EMPTY);
-
-		bool TxMailboxesFull = HAL_CAN_GetTxMailboxesFreeLevel(canBus) == 0;
-		if ( TxMailboxesFull ) {
-			DbgPrintf("%s all TX mailboxes are full", CANname.c_str());
+	if ( !TxMailboxesFull ) {
+		if ( SendFromBuffer ) {
+			ret = SendFromTxRing();
+		} else {
+			ret = CANWriteTxMailbox(message->id, message->len, message->buf, message->flags.extended);
 		}
-		bool SendFromBuffer = false;
+		/* transmit entry accepted */
+	}
 
-		// If TX buffer has already some frames waiting with higher prio or mailbox is full, buffer frame
-		if ( !txRing->isEmpty(prio) || TxMailboxesFull ) {
-			CAN_message_t *msg = txRing->getAddRef(prio);
-			if ( msg!=0 ) {
-				memcpy(msg, message, sizeof(*msg));
-				ret = true;
-				//frame buffered
-				bufferFull = false;
-				DbgPrintf("%s frame 0x%lx buffered", CANname.c_str(), message->id);
-			}
-			else if (!bufferFull){
-				bufferFull = true;
-				ErrDbgPrintf("%s TX ringbuffer is full", CANname.c_str());
-			}
-			SendFromBuffer = true;
-		}
+	HAL_CAN_ActivateNotification(canBus, CAN_IT_TX_MAILBOX_EMPTY);
 
-		if ( !TxMailboxesFull ) {
-			if ( SendFromBuffer ) {
-				ret = SendFromTxRing();
-			} else {
-				ret = CANWriteTxMailbox(message->id, message->len, message->buf, message->flags.extended);
-			}
-			/* transmit entry accepted */
-		}
-
-		HAL_CAN_ActivateNotification(canBus, CAN_IT_TX_MAILBOX_EMPTY);
-
-		return ret;
+	return ret;
 }
 //*****************************************************************************
 bool tSTM32_CAN::CANGetFrame(unsigned long& id, unsigned char& len, unsigned char* buf) {
@@ -453,13 +450,18 @@ HAL_StatusTypeDef tSTM32_CAN::CANInit()
 	canBus->Init.TimeSeg1 = CANtimeSeg1;
 	canBus->Init.TimeSeg2 = CANtimeSeg2;
 	canBus->Init.TimeTriggeredMode = DISABLE;
-	canBus->Init.AutoBusOff = DISABLE;
-	canBus->Init.AutoWakeUp = DISABLE;
+	canBus->Init.AutoBusOff = ENABLE;
+	canBus->Init.AutoWakeUp = ENABLE;
 	canBus->Init.AutoRetransmission = ENABLE;
 	canBus->Init.ReceiveFifoLocked = DISABLE;
 	canBus->Init.TransmitFifoPriority = ENABLE;
 
 	return HAL_CAN_Init(canBus);
+}
+
+void tSTM32_CAN::CANDeinit()
+{
+	HAL_CAN_DeInit(canBus);
 }
 
 /*******************************************************************************
@@ -534,8 +536,6 @@ HAL_StatusTypeDef tSTM32_CAN::SetCANFilter(bool ExtendedId, uint32_t FilterNum, 
 	return ret;
 }
 
-
-
 /*******************************************************************************
   * @brief  returns pointer to tSTM32_CAN instance from certain CAN_HandleTypeDef struct
   * @param  hcan CAN_HandleTypeDef pointer
@@ -559,34 +559,34 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
 {
 	getInstance(hcan)->CANReadRxMailbox(hcan, CAN_RX_FIFO0);
 	//DbgPrintf("%s HAL_CAN_RxFifo0MsgPendingCallback", getInstance(hcan)->CANname.c_str());
-	getInstance(hcan)->setCanError(hcan->ErrorCode); // copy CAN error state from HAL CAN handler to STM_CAN_Lib instance
+	getInstance(hcan)->setImportantCanError(hcan->ErrorCode); // copy CAN error state from HAL CAN handler to STM_CAN_Lib instance
 }
 
 void HAL_CAN_TxMailbox0CompleteCallback(CAN_HandleTypeDef *hcan)
 {
 	getInstance(hcan)->SendFromTxRing(); // send message with highest priority on ring buffer
 	//DbgPrintf("%s HAL_CAN_TxMailbox0CompleteCallback", getInstance(hcan)->CANname.c_str());
-	getInstance(hcan)->setCanError(hcan->ErrorCode); // copy CAN error state from HAL CAN handler to STM_CAN_Lib instance
+	getInstance(hcan)->setImportantCanError(hcan->ErrorCode);
 
 }
 void HAL_CAN_TxMailbox1CompleteCallback(CAN_HandleTypeDef *hcan)
 {
 	getInstance(hcan)->SendFromTxRing(); // send message with highest priority on ring buffer
-	getInstance(hcan)->setCanError(hcan->ErrorCode); // copy CAN error state from HAL CAN handler to STM_CAN_Lib instance
+	getInstance(hcan)->setImportantCanError(hcan->ErrorCode);
 }
 void HAL_CAN_TxMailbox2CompleteCallback(CAN_HandleTypeDef *hcan)
 {
 	getInstance(hcan)->SendFromTxRing(); // send message with highest priority on ring buffer
-	getInstance(hcan)->setCanError(hcan->ErrorCode); // copy CAN error state from HAL CAN handler to STM_CAN_Lib instance
+	getInstance(hcan)->setImportantCanError(hcan->ErrorCode);
 }
 
 
 void HAL_CAN_ErrorCallback(CAN_HandleTypeDef *hcan)
 {
-	getInstance(hcan)->setCanError(hcan->ErrorCode);
+	getInstance(hcan)->setImportantCanError(hcan->ErrorCode);
 
 #if defined(STM32_CAN_DEBUG_ERRORS)
-   if(hcan->ErrorCode & HAL_CAN_ERROR_NONE)           { ErrDbgPrintf("%s: No error", getInstance(hcan)->CANname.c_str()); }
+   if(hcan->ErrorCode == 0)					           { ErrDbgPrintf("%s: No error", getInstance(hcan)->CANname.c_str()); }
    if(hcan->ErrorCode & HAL_CAN_ERROR_EWG)             { ErrDbgPrintf("%s: Protocol Error Warning", getInstance(hcan)->CANname.c_str()); }
    if(hcan->ErrorCode & HAL_CAN_ERROR_EPV)             { ErrDbgPrintf("%s: Error Passive", getInstance(hcan)->CANname.c_str()); }
    if(hcan->ErrorCode & HAL_CAN_ERROR_BOF)             { ErrDbgPrintf("%s: Bus-off error", getInstance(hcan)->CANname.c_str()); }
@@ -612,6 +612,26 @@ void HAL_CAN_ErrorCallback(CAN_HandleTypeDef *hcan)
 #endif
 }
 
+void HAL_CAN_SleepCallback(CAN_HandleTypeDef *hcan)
+{
+	DbgPrintf("%s: sleep callback", getInstance(hcan)->CANname.c_str());
+
+}
+
+/*
+void tSTM32_CAN::LoopbackMode()
+{
+	canBus->Init.Mode = CAN_MODE_LOOPBACK;
+	HAL_CAN_Init(canBus);
+	ErrDbgPrintf("%s: loopback mode", CANname.c_str());
+}
+void tSTM32_CAN::NormalMode()
+{
+	canBus->Init.Mode = CAN_MODE_NORMAL;
+	HAL_CAN_Init(canBus);
+	ErrDbgPrintf("%s: Normal mode", CANname.c_str());
+}
+*/
 
 // *****************************************************************************
 //	Other 'Bridge' functions
