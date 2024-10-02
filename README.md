@@ -1,7 +1,7 @@
 # STM32_CAN library
 
 Designed for STM32F105 CAN gateway.
-https://github.com/BitterAndReal/STM32_NMEA2000_CAN_gateway
+[https://github.com/minoseigenheer/STM32_NMEA2000_CAN_gateway](https://github.com/minoseigenheer/STM32_CAN_gateway)
 Might also works with F103 / F107 / F405 / F407... and other STM32 MCU's with integrated bxCAN controller.
 
 
@@ -9,11 +9,11 @@ Might also works with F103 / F107 / F405 / F407... and other STM32 MCU's with in
   - STM32 HAL for your MCU
 
 ### Can be used with the following libraries
-  - NMEA2000_STM32 library https://github.com/BitterAndReal/NMEA2000_STM32
+  - NMEA2000_STM32 library https://github.com/minoseigenheer/NMEA2000_STM32
     & NMEA2000 library https://github.com/ttlappalainen/NMEA2000
 
 ### Example
-- [STM32CubeIDE NMEA2000 battery project example](https://github.com/BitterAndReal/STM32_NMEA2000_CAN_gateway/tree/main/STM32CubeIDE%20NMEA2000%20battery%20example)
+- [STM32CubeIDE NMEA2000 battery project example](https://github.com/minoseigenheer/STM32_CAN_gateway/tree/main/STM32CubeIDE%20NMEA2000%20battery%20example)
   Import project into your STM32CubeIDE workspace
 
 ### How to use the library
@@ -47,7 +47,7 @@ CANbus1.CANGetFrame(&id, &len, &buf);
 ---
 ### STM23CubeIDE setup 
 If you are not very experienced with STM23CubeIDE this guide can help to configure a project for your own STM32 based hardware.
-**I recommend start with this [example](https://github.com/BitterAndReal/STM32_NMEA2000_CAN_gateway/tree/main/STM32CubeIDE%20NMEA2000%20battery%20example)**
+**I recommend start with this [example](https://github.com/minoseigenheer/STM32_CAN_gateway/tree/main/STM32CubeIDE%20NMEA2000%20battery%20example)**
   - Create a STM32 C++ project in STM23CubeIDE
   - Select your MCU which will add the correct HAL to your project.
   - We can not directly call C++ from the main.c
@@ -65,7 +65,7 @@ If you are not very experienced with STM23CubeIDE this guide can help to configu
     > cd YourProjectRepo/Libs
     > git submodule add https://github.com/ttlappalainen/NMEA2000
     > git submodule update --init --recursive
-    > git submodule add https://github.com/BitterAndReal/NMEA2000_STM32
+    > git submodule add https://github.com/minoseigenheer/NMEA2000_STM32
     > git submodule update --init --recursive
     > // and update them with 
     > git submodule foreach git pull
