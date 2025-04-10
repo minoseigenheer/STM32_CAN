@@ -55,7 +55,7 @@ If you are not very experienced with STM23CubeIDE this guide can help to configu
   - In Cube MX configure external clock settings of your MCU. 
     > CAN bus needs an external clock source!
   - Activate the CAN bus you want to use.
-  - Enable the CAN RX1 interrupt in the NVIC settings
+  - Enable the CAN RX0 interrupt in the NVIC settings
   - Enable the CAN TX interrupt in the NVIC settings
   - If you want to use this library with the NMEA2000 library
     >Copy the NMEA2000 and NMEA_STM32 library's to your "Libs" folder of your STM32Cube project 
